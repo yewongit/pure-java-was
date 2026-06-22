@@ -48,3 +48,7 @@
   2. 연결이 수립될 때마다 자바의 new Thread()를 동적으로 생성하고, 요청 파싱 및 응답 송신 로직을 새로 생성된 작업 스레드에게 위임
   3. 이로 인해 특정 클라이언트의 I/O 작업이 지연되더라도, 메인 스레드는 즉시 다음 accept() 대기 상태로 복귀하므로 동시 접속자 간의 간섭이 없음
 - **한계점** : 현재 구조는 요청이 올 때마다 스레드를 무제한으로 생성하므로 동시 접속자가 폭증할 경우 CPU와 메모리 자원이 고갈되는 위험이 있음, 실제 Tomcat과 Spring Boot는 이를 방지하기 위해 스레드를 미리 만들어두고 재사용하는 Thread Pool 개념을 도입하여 자원을 효율적으로 관리함
+
+<br>
+
+[![Velog's Badge](https://img.shields.io/badge/Velog-20C997?style=for-the-badge&logo=velog&logoColor=white)](https://velog.io/@yewonyun/Apache-Tomcat)
