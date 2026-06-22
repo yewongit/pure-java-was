@@ -23,48 +23,53 @@ public class MyTomcat {
                 // clientSocket 객체는 브라우저와 내 서버를 1:1로 다이렉트 연결한 양방향 전화선
                 // out.write()로 데이터를 밀어넣은 것은, clientSockt을 타고 브라우저의 소켓을 향해 흘러가게 됨
 
-                // 브라우저가 네트워크를 통해 보내는 바이트 데이터 읽기
-                BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                // 메인 스레드는 오직 문지기 역할만 수행
+                // 요청이 올 때마다 독립된 전담 스레드를 생성하여 일을 넘김
+                Thread clientHandler = new Thread(() -> handleClient(clientSocket));
 
-                String line;
-
-                // HTTP 프로토콜 규격상, 브라우저가 보내는 요청 메시지는 헤더 뒤에 빈줄을 한 줄 넣음 -> "!line.isEmpty()" 조건으로 Blocking 막음
-                while ((line = reader.readLine()) != null && !line.isEmpty()) {
-                    System.out.println(line);
-                }
-
-                // 브라우저에게 답장을 보내기 위한 Output Stream 개설
-                DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
-
-                // 1. 브라우저 화면에 띄울 진짜 알맹이(HTML 바디) 준비
-                String htmlBody = "<h1>Hello from MyTomcat!</h1><p>Success to connect!</p>";
-                byte[] bodyBytes = htmlBody.getBytes("UTF-8"); // 영문/한글 깨짐 방지를 위해 바이트 배열로 변환
-
-                // 2. HTTP 응답 규격 약속 지켜서 보내기
-                // (1) 상태 라인: "HTTP 1.1 버전을 쓸 거고, 네 요청은 성공(200 OK)했어!"
-                out.writeBytes("HTTP/1.1 200 OK \r\n");
-
-                // (2) 헤더 정보: "내가 보내는 데이터는 HTML 텍스트고, 인코딩은 UTF-8이야."
-                out.writeBytes("Content-Type: text/html;charset=utf-8 \r\n");
-
-                // (3) 헤더 정보: "내가 보낼 진짜 바디 데이터의 총 길이는 이만큼이야."
-                out.writeBytes("Content-Length: " + bodyBytes.length + " \r\n");
-
-                // (4) 빈 줄 : "내 헤더 설명은 끝났으니 이제부터 진짜 데이터(바디) 나간다!"
-                out.writeBytes("\r\n");
-
-                // (5) 바디 전송: 진짜 HTML 알맹이를 전선에 태워 보냅니다.
-                out.write(bodyBytes, 0, bodyBytes.length);
-
-                // 3. 전선에 남아있는 찌꺼기 데이터까지 쫙 밀어내기 (새로고침 반영)
-                out.flush();
-
-                // 현재 요청과의 대화가 끝났으므로 양방향 소켓 통신을 명시적으로 닫아줌
-                // 다음 accept()로 넘어가서 다음 요청을 받을 수 있음
-                clientSocket.close();
+                // 비동기로 실행되므로 메인 스레드는 즉시 다음 accept()로 넘어감
+                clientHandler.start();
             }
-        }catch(Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private static void handleClient(Socket clientSocket){
+        String threadName = Thread.currentThread().getName();
+
+        try(
+                Socket socket = clientSocket;
+                BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+                DataOutputStream out = new DataOutputStream(socket.getOutputStream())
+                ){
+                    // 브라우저가 네트워크를 통해 보내는 바이트 데이터 읽기
+                    String line;
+                    // HTTP 프로토콜 규격상, 브라우저가 보내는 요청 메시지는 헤더 뒤에 빈줄을 한 줄 넣음 -> "!line.isEmpty()" 조건으로 Blocking 막음
+                    while((line = reader.readLine()) != null && !line.isEmpty()) {
+                        System.out.println("[" + threadName + "]" + line);
+                    }
+                    // 브라우저 화면에 띄울 진짜 알맹이(HTML 바디) 준비
+                    String htmlBody = "<h1>Hello from Multi-Thread MyTomcat!</h1><p>Thread Name: " + threadName + "</p>";
+                    byte[] bodyBytes = htmlBody.getBytes("UTF-8");
+
+                    // 2. HTTP 응답 규격 약속 지켜서 보내기
+                    // (1) 상태 라인: "HTTP 1.1 버전을 쓸 거고, 네 요청은 성공(200 OK)했어!"
+                    out.writeBytes("HTTP/1.1 200 OK \r\n");
+                    // (2) 헤더 정보: "내가 보내는 데이터는 HTML 텍스트고, 인코딩은 UTF-8이야."
+                    out.writeBytes("Content-Type: text/html;charset=utf-8 \r\n");
+                    // (3) 헤더 정보: "내가 보낼 진짜 바디 데이터의 총 길이는 이만큼이야."
+                    out.writeBytes("Content-Length: " + bodyBytes.length + " \r\n");
+                    // (4) 빈 줄 : "내 헤더 설명은 끝났으니 이제부터 진짜 데이터(바디) 나간다!"
+                    out.writeBytes("\r\n");
+
+                    // (5) 바디 전송: 진짜 HTML 알맹이를 전선에 태워 보냅니다.
+                    out.write(bodyBytes, 0, bodyBytes.length);
+
+                    // 전선에 남아있는 찌꺼기 데이터까지 쫙 밀어내기 (새로고침 반영)
+                    out.flush();
+        }catch(Exception e){
+            System.err.println("[" + threadName + "] 에러 발생: " + e.getMessage());
         }
     }
 }
