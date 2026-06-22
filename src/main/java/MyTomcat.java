@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.InputStreamReader;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -27,7 +28,34 @@ public class MyTomcat {
                 System.out.println(line);
             }
 
-            System.out.println("요청을 모두 읽었으므로 프로그램을 종료");
+            // 브라우저에게 답장을 보내기 위한 Output Stream 개설
+            DataOutputStream out = new DataOutputStream(clientSocket.getOutputStream());
+
+            // 1. 브라우저 화면에 띄울 진짜 알맹이(HTML 바디) 준비
+            String htmlBody = "<h1>Hello from MyTomcat!</h1><p>Success to connect!</p>";
+            byte[] bodyBytes = htmlBody.getBytes("UTF-8"); // 영문/한글 깨짐 방지를 위해 바이트 배열로 변환
+
+            System.out.println("\n--- ✉️ [서버가 브라우저에게 보내는 정식 HTTP 응답] ---");
+
+            // 2. HTTP 응답 규격 약속 지켜서 보내기
+            // (1) 상태 라인: "HTTP 1.1 버전을 쓸 거고, 네 요청은 성공(200 OK)했어!"
+            out.writeBytes("HTTP/1.1 200 OK \r\n");
+
+            // (2) 헤더 정보: "내가 보내는 데이터는 HTML 텍스트고, 인코딩은 UTF-8이야."
+            out.writeBytes("Content-Type: text/html;charset=utf-8 \r\n");
+
+            // (3) 헤더 정보: "내가 보낼 진짜 바디 데이터의 총 길이는 이만큼이야."
+            out.writeBytes("Content-Length: " + bodyBytes.length + " \r\n");
+
+            // (4) 빈 줄 : "내 헤더 설명은 끝났으니 이제부터 진짜 데이터(바디) 나간다!"
+            out.writeBytes("\r\n");
+
+            // (5) 바디 전송: 진짜 HTML 알맹이를 전선에 태워 보냅니다.
+            out.write(bodyBytes, 0, bodyBytes.length);
+
+            // 3. 전선에 남아있는 찌꺼기 데이터까지 쫙 밀어내기 (새로고침 반영)
+            out.flush();
+            System.out.println("[알림] 성공적으로 응답을 보냈습니다. 프로그램을 종료합니다.");
         } catch (Exception e) {
             e.printStackTrace();
         }
